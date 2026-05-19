@@ -195,7 +195,7 @@ input[type=number]{width:80px;text-align:center;font-size:18px;font-weight:700}
 <div id="login-screen">
   <div class="login-box">
     <div class="login-cross">✝️</div>
-    <div class="login-title">HWIM Bangkok</div>
+    <div class="login-title">Grace Church</div>
     <div class="login-sub">Cell Group Attendance System</div>
     <div class="login-label">Select your name to continue</div>
     <select class="login-select" id="leader-select">
@@ -432,35 +432,58 @@ function checkConfig(){
 }
 
 // ═══════════════════════════════════════════════════════
-// API LAYER — talks to Google Apps Script
+// API LAYER — JSONP (fixes CORS from GitHub Pages)
 // ═══════════════════════════════════════════════════════
+
+// All calls go through JSONP so the browser never blocks them.
+// GET  → ?action=...&callback=cb_xxx  (Apps Script returns cb_xxx({...}))
+// POST → encoded as GET params        (Apps Script reads e.parameter)
+
+function jsonp(params) {
+  return new Promise((resolve, reject) => {
+    const cbName = 'cb_' + Math.random().toString(36).slice(2);
+    const timeout = setTimeout(() => {
+      delete window[cbName];
+      reject(new Error('Request timed out. Check your Script URL and that the Web App is deployed as "Anyone".'));
+    }, 15000);
+
+    window[cbName] = (data) => {
+      clearTimeout(timeout);
+      delete window[cbName];
+      if (data && data.error) reject(new Error(data.error));
+      else resolve(data);
+    };
+
+    const qs = Object.entries({...params, callback: cbName})
+      .map(([k,v]) => `${encodeURIComponent(k)}=${encodeURIComponent(typeof v === 'object' ? JSON.stringify(v) : v)}`)
+      .join('&');
+
+    const script = document.createElement('script');
+    script.src = `${SCRIPT_URL}?${qs}&t=${Date.now()}`;
+    script.onerror = () => {
+      clearTimeout(timeout);
+      delete window[cbName];
+      reject(new Error('Script load failed. Check your Apps Script URL.'));
+    };
+    document.head.appendChild(script);
+    setTimeout(() => { try { document.head.removeChild(script); } catch(e){} }, 20000);
+  });
+}
+
 async function apiGet(sheet) {
-  const url = `${SCRIPT_URL}?action=getAll&sheet=${sheet}&t=${Date.now()}`;
-  const res = await fetch(url);
-  const json = await res.json();
-  if (json.error) throw new Error(json.error);
-  return json.rows || [];
+  const data = await jsonp({ action: 'getAll', sheet });
+  return data.rows || [];
 }
 
 async function apiPost(body) {
-  const res = await fetch(SCRIPT_URL, {
-    method: 'POST',
-    body: JSON.stringify(body),
-    headers: {'Content-Type': 'application/json'}
-  });
-  const json = await res.json();
-  if (json.error) throw new Error(json.error);
-  return json;
+  // Encode POST body as a GET param — Apps Script reads e.parameter.payload
+  return jsonp({ action: body.action, payload: body });
 }
 
-async function apiInit()   { return apiPost({action:'init'}); }
-async function apiInsert(sheet, data) { return apiPost({action:'insert', sheet, data}); }
-async function apiUpdate(sheet, data) { return apiPost({action:'update', sheet, data}); }
-async function apiDelete(sheet, id)   { return apiPost({action:'delete', sheet, data:{id}}); }
-async function apiUpsertLog(sheet, leader_id, date, count){
-  // Try update first, insert if not exists — handled server-side but we replicate in JS cache
-  return apiPost({action:'insert', sheet, data:{leader_id, date, count}});
-}
+async function apiInit()                       { return jsonp({ action: 'init' }); }
+async function apiInsert(sheet, data)          { return jsonp({ action: 'insert', sheet, payload: data }); }
+async function apiUpdate(sheet, data)          { return jsonp({ action: 'update', sheet, payload: data }); }
+async function apiDelete(sheet, id)            { return jsonp({ action: 'delete', sheet, id }); }
 
 // ═══════════════════════════════════════════════════════
 // LOCAL CACHE (for fast rendering between fetches)
@@ -1002,3 +1025,4 @@ if(SCRIPT_URL) initApp();
 </script>
 </body>
 </html>
+
