@@ -195,7 +195,7 @@ input[type=number]{width:80px;text-align:center;font-size:18px;font-weight:700}
 <div id="login-screen">
   <div class="login-box">
     <div class="login-cross">✝️</div>
-    <div class="login-title">Grace Church</div>
+    <div class="login-title">HWIM Bangkok</div>
     <div class="login-sub">Cell Group Attendance System</div>
     <div class="login-label">Select your name to continue</div>
     <select class="login-select" id="leader-select">
@@ -1008,7 +1008,7 @@ function exportCSV(){
   const csv=rows.map(r=>r.map(v=>`"${v}"`).join(',')).join('\n');
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
-  a.download=`grace_church_${from}_to_${to}.csv`;
+  a.download=`HWIM_Bangkok_${from}_to_${to}.csv`;
   a.click();
 }
 
