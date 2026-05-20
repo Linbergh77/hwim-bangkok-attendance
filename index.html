@@ -743,17 +743,16 @@ async function loadLeaders(){
 }
 
 // ══════════════════════════════════════════════════════════
-// DASHBOARD  (Fix #1 — avg per month)
+// DASHBOARD — Average calculations
+// CG meets once/week, Sunday once/week
+// Correct formula: total attendees ÷ number of sessions logged
+// Example: sessions with 8,10,9 people → avg = (8+10+9)÷3 = 9
 // ══════════════════════════════════════════════════════════
-function avgPerMonth(logs, leaderId){
+function avgPerSession(logs, leaderId){
   const mine = logs.filter(x=>x.leader_id==leaderId);
   if (!mine.length) return 0;
-  // group by YYYY-MM
-  const byMonth={};
-  mine.forEach(x=>{const m=String(x.date).slice(0,7);byMonth[m]=(byMonth[m]||0)+Number(x.count);});
-  const months=Object.keys(byMonth);
-  const total=months.reduce((s,m)=>s+byMonth[m],0);
-  return months.length ? Math.round(total/months.length) : 0;
+  const total = mine.reduce((s,x)=>s+Number(x.count), 0);
+  return Math.round(total / mine.length);
 }
 
 function renderDashboard(){
@@ -762,14 +761,14 @@ function renderDashboard(){
   const mems=CACHE.members.filter(m=>m.leader_id==CL.id);
   const cgs =CACHE.cgLogs.filter(x=>x.leader_id==CL.id).sort((a,b)=>b.date>a.date?1:-1);
   const suns=CACHE.sunLogs.filter(x=>x.leader_id==CL.id).sort((a,b)=>b.date>a.date?1:-1);
-  const avgCG  = avgPerMonth(CACHE.cgLogs, CL.id);
-  const avgSun = avgPerMonth(CACHE.sunLogs, CL.id);
+  const avgCG  = avgPerSession(CACHE.cgLogs,  CL.id);
+  const avgSun = avgPerSession(CACHE.sunLogs, CL.id);
 
   document.getElementById('dash-stats').innerHTML=[
-    {l:'My Members',     v:mems.length, sub:'total registered', c:'#C8873A'},
-    {l:'CG Meetings',    v:cgs.length,  sub:'sessions logged',  c:'#2E86AB'},
-    {l:'Avg CG/month',   v:avgCG,       sub:'attendees avg',    c:'#2D936C'},
-    {l:'Avg Sunday/mo',  v:avgSun,      sub:'attendees avg',    c:'#8B5CF6'},
+    {l:'My Members',      v:mems.length, sub:'total registered',     c:'#C8873A'},
+    {l:'CG Sessions',     v:cgs.length,  sub:'sessions logged',      c:'#2E86AB'},
+    {l:'Avg CG Attendees',v:avgCG,       sub:'per session avg',      c:'#2D936C'},
+    {l:'Avg Sun Attendees',v:avgSun,     sub:'per session avg',      c:'#8B5CF6'},
   ].map(s=>`<div class="stat-card" style="--accent-line:${s.c}">
     <div class="stat-val" style="color:${s.c}">${s.v}</div>
     <div class="stat-lbl">${s.l}</div>
