@@ -569,8 +569,8 @@ function checkReminder(){
   lastSunday.setDate(now.getDate() - dow);
   const lastSundayStr = lastSunday.toISOString().slice(0,10);
 
-  const hasLoggedCG  = CACHE.cgLogs.some(x=>x.leader_id==CL.id && x.date>=lastSundayStr);
-  const hasLoggedSun = CACHE.sunLogs.some(x=>x.leader_id==CL.id && x.date>=lastSundayStr);
+  const hasLoggedCG  = CACHE.cgLogs.some(x=>String(x.leader_id)===String(CL.id) && x.date>=lastSundayStr);
+  const hasLoggedSun = CACHE.sunLogs.some(x=>String(x.leader_id)===String(CL.id) && x.date>=lastSundayStr);
   const dismissed    = localStorage.getItem(key);
 
   // Show in-app banner if: Sunday after 12pm OR any day without update, not dismissed today
@@ -648,7 +648,7 @@ function populateLeaderSel(leaders){
 async function doLogin(){
   const id=document.getElementById('leader-select').value;
   if(!id){alert('Please select your name.');return;}
-  const leader=CACHE.leaders.find(x=>x.id==id);
+  const leader=CACHE.leaders.find(x=>String(x.id)===String(id));
   if(!leader){alert('Leader not found.');return;}
 
   document.getElementById('login-btn').disabled=true;
@@ -749,7 +749,9 @@ async function loadLeaders(){
 // Example: sessions with 8,10,9 people → avg = (8+10+9)÷3 = 9
 // ══════════════════════════════════════════════════════════
 function avgPerSession(logs, leaderId){
-  const mine = logs.filter(x=>x.leader_id==leaderId);
+  // Use String() comparison to handle Google Sheets returning numbers vs strings
+  const sid = String(leaderId);
+  const mine = logs.filter(x=>String(x.leader_id)===sid);
   if (!mine.length) return 0;
   const total = mine.reduce((s,x)=>s+Number(x.count), 0);
   return Math.round(total / mine.length);
@@ -758,9 +760,9 @@ function avgPerSession(logs, leaderId){
 function renderDashboard(){
   const h=new Date().getHours();
   document.getElementById('dash-greeting').textContent=(h<12?'Good morning, ':h<17?'Good afternoon, ':'Good evening, ')+CL.name+'!';
-  const mems=CACHE.members.filter(m=>m.leader_id==CL.id);
-  const cgs =CACHE.cgLogs.filter(x=>x.leader_id==CL.id).sort((a,b)=>b.date>a.date?1:-1);
-  const suns=CACHE.sunLogs.filter(x=>x.leader_id==CL.id).sort((a,b)=>b.date>a.date?1:-1);
+  const mems=CACHE.members.filter(m=>String(m.leader_id)===String(CL.id));
+  const cgs =CACHE.cgLogs.filter(x=>String(x.leader_id)===String(CL.id)).sort((a,b)=>b.date>a.date?1:-1);
+  const suns=CACHE.sunLogs.filter(x=>String(x.leader_id)===String(CL.id)).sort((a,b)=>b.date>a.date?1:-1);
   const avgCG  = avgPerSession(CACHE.cgLogs,  CL.id);
   const avgSun = avgPerSession(CACHE.sunLogs, CL.id);
 
@@ -802,11 +804,11 @@ async function refreshDashboard(){
 function renderMembers(){
   const q=document.getElementById('mem-search').value.toLowerCase();
   const cat=document.getElementById('mem-cat').value;
-  let m=CACHE.members.filter(x=>x.leader_id==CL.id);
+  let m=CACHE.members.filter(x=>String(x.leader_id)===String(CL.id));
   if(q) m=m.filter(x=>x.name.toLowerCase().includes(q));
   if(cat) m=m.filter(x=>x.category===cat);
   m.sort((a,b)=>a.name.localeCompare(b.name));
-  document.getElementById('mem-sub').textContent=CACHE.members.filter(x=>x.leader_id==CL.id).length+' members in your cell group';
+  document.getElementById('mem-sub').textContent=CACHE.members.filter(x=>String(x.leader_id)===String(CL.id)).length+' members in your cell group';
   document.getElementById('mem-tbody').innerHTML=m.length
     ?m.map((x,i)=>`<tr>
       <td style="color:var(--sub)">${i+1}</td>
@@ -823,7 +825,7 @@ function renderMembers(){
 function openMemModal(id=null){
   _editMemId=id;
   document.getElementById('mem-modal-title').textContent=id?'Edit Member':'Add Member';
-  if(id){const m=CACHE.members.find(x=>x.id==id);document.getElementById('m-name').value=m.name;document.getElementById('m-phone').value=m.phone||'';document.getElementById('m-email').value=m.email||'';document.getElementById('m-cat').value=m.category||'';document.getElementById('m-active').value=m.active;}
+  if(id){const m=CACHE.members.find(x=>String(x.id)===String(id));document.getElementById('m-name').value=m.name;document.getElementById('m-phone').value=m.phone||'';document.getElementById('m-email').value=m.email||'';document.getElementById('m-cat').value=m.category||'';document.getElementById('m-active').value=m.active;}
   else{['m-name','m-phone','m-email'].forEach(i=>document.getElementById(i).value='');document.getElementById('m-cat').value='';document.getElementById('m-active').value='1';}
   document.getElementById('mem-overlay').classList.add('open');
 }
@@ -836,7 +838,7 @@ async function saveMember(){
   const data={name,category:cat,phone:document.getElementById('m-phone').value.trim(),email:document.getElementById('m-email').value.trim(),active:document.getElementById('m-active').value,leader_id:CL.id};
   setBtn('mem-save-btn',true,'Save');
   try{setSyncStatus('loading');
-    if(_editMemId){data.id=_editMemId;await apiUpdate(SH.MEMBERS,data);const i=CACHE.members.findIndex(x=>x.id==_editMemId);if(i>-1)Object.assign(CACHE.members[i],data);}
+    if(_editMemId){data.id=_editMemId;await apiUpdate(SH.MEMBERS,data);const i=CACHE.members.findIndex(x=>String(x.id)===String(_editMemId));if(i>-1)Object.assign(CACHE.members[i],data);}
     else{const res=await apiInsert(SH.MEMBERS,data);data.id=res.id;CACHE.members.push(data);}
     setSyncStatus('ok');closeMemModal();renderMembers();renderDashboard();
   }catch(e){setSyncStatus('err');alert('Save failed: '+e.message);}
@@ -855,13 +857,13 @@ async function delMember(id,name){
 // ══════════════════════════════════════════════════════════
 function renderLogPage(){renderCGHist();renderSunHist();}
 function renderCGHist(){
-  const logs=CACHE.cgLogs.filter(x=>x.leader_id==CL.id).sort((a,b)=>b.date>a.date?1:-1);
+  const logs=CACHE.cgLogs.filter(x=>String(x.leader_id)===String(CL.id)).sort((a,b)=>b.date>a.date?1:-1);
   document.getElementById('cg-hist').innerHTML=logs.length
     ?logs.map(r=>`<div class="log-entry"><div style="font-weight:600">${r.date}</div><div style="display:flex;align-items:center;gap:8px"><span class="log-num">${r.count}</span><button class="btn btn-danger btn-sm" onclick="delCG(${r.id})">✕</button></div></div>`).join('')
     :'<div class="empty">No CG logs yet.</div>';
 }
 function renderSunHist(){
-  const logs=CACHE.sunLogs.filter(x=>x.leader_id==CL.id).sort((a,b)=>b.date>a.date?1:-1);
+  const logs=CACHE.sunLogs.filter(x=>String(x.leader_id)===String(CL.id)).sort((a,b)=>b.date>a.date?1:-1);
   document.getElementById('sun-hist').innerHTML=logs.length
     ?logs.map(r=>`<div class="log-entry"><div style="font-weight:600">${r.date}</div><div style="display:flex;align-items:center;gap:8px"><span class="log-num log-num-blue">${r.count}</span><button class="btn btn-danger btn-sm" onclick="delSun(${r.id})">✕</button></div></div>`).join('')
     :'<div class="empty">No Sunday logs yet.</div>';
@@ -872,7 +874,7 @@ async function saveCG(){
   if(!date){alert('Please select a date.');return;}
   setBtn('cg-save-btn',true,'Save CG Log');setSyncStatus('loading');
   try{
-    const ex=CACHE.cgLogs.find(x=>x.leader_id==CL.id&&x.date===date);
+    const ex=CACHE.cgLogs.find(x=>String(x.leader_id)===String(CL.id)&&x.date===date);
     if(ex){ex.count=count;await apiUpdate(SH.CG,{id:ex.id,count});}
     else{const res=await apiInsert(SH.CG,{leader_id:CL.id,date,count});CACHE.cgLogs.push({id:res.id,leader_id:CL.id,date,count});}
     setSyncStatus('ok');flash(`✔ CG meeting on ${date} saved — ${count} attendees.`);
@@ -886,7 +888,7 @@ async function saveSun(){
   if(!date){alert('Please select a date.');return;}
   setBtn('sun-save-btn',true,'Save Sunday Log');setSyncStatus('loading');
   try{
-    const ex=CACHE.sunLogs.find(x=>x.leader_id==CL.id&&x.date===date);
+    const ex=CACHE.sunLogs.find(x=>String(x.leader_id)===String(CL.id)&&x.date===date);
     if(ex){ex.count=count;await apiUpdate(SH.SUN,{id:ex.id,count});}
     else{const res=await apiInsert(SH.SUN,{leader_id:CL.id,date,count});CACHE.sunLogs.push({id:res.id,leader_id:CL.id,date,count});}
     setSyncStatus('ok');flash(`✔ Sunday on ${date} saved — ${count} attendees.`);
@@ -902,13 +904,13 @@ async function delSun(id){if(!confirm('Delete?'))return;try{setSyncStatus('loadi
 // ══════════════════════════════════════════════════════════
 function renderLeaders(){
   document.getElementById('lead-tbody').innerHTML=CACHE.leaders.sort((a,b)=>a.name.localeCompare(b.name)).map((l,i)=>{
-    const mc=CACHE.members.filter(x=>x.leader_id==l.id).length;
-    const cgLogs=CACHE.cgLogs.filter(x=>x.leader_id==l.id);
-    const sunLogs=CACHE.sunLogs.filter(x=>x.leader_id==l.id);
+    const mc=CACHE.members.filter(x=>String(x.leader_id)===String(l.id)).length;
+    const cgLogs=CACHE.cgLogs.filter(x=>String(x.leader_id)===String(l.id));
+    const sunLogs=CACHE.sunLogs.filter(x=>String(x.leader_id)===String(l.id));
     const lastCG=cgLogs.length?[...cgLogs].sort((a,b)=>b.date>a.date?1:-1)[0].date:'—';
     const lastSun=sunLogs.length?[...sunLogs].sort((a,b)=>b.date>a.date?1:-1)[0].date:'—';
     const lastUpdate=lastCG>lastSun?lastCG:lastSun;
-    const isMe=l.id==CL.id;
+    const isMe=String(l.id)===String(CL.id);
     // flag if no update this week
     const now=new Date(),dow=now.getDay();
     const lastSundayStr=new Date(now.setDate(now.getDate()-dow)).toISOString().slice(0,10);
@@ -929,7 +931,7 @@ function renderLeaders(){
 function openLeadModal(id=null){
   _editLeadId=id;
   document.getElementById('lead-modal-title').textContent=id?'Edit Leader':'Add Leader';
-  document.getElementById('l-name').value=id?(CACHE.leaders.find(x=>x.id==id)||{}).name||'':'';
+  document.getElementById('l-name').value=id?(CACHE.leaders.find(x=>String(x.id)===String(id))||{}).name||'':'';
   document.getElementById('lead-overlay').classList.add('open');
   document.getElementById('l-name').focus();
 }
@@ -950,9 +952,9 @@ async function delLeader(id,name){
   showLoader('Deleting…');
   try{
     setSyncStatus('loading');
-    const mIds=CACHE.members.filter(x=>x.leader_id==id).map(x=>x.id);
-    const cIds=CACHE.cgLogs.filter(x=>x.leader_id==id).map(x=>x.id);
-    const sIds=CACHE.sunLogs.filter(x=>x.leader_id==id).map(x=>x.id);
+    const mIds=CACHE.members.filter(x=>String(x.leader_id)===String(id)).map(x=>x.id);
+    const cIds=CACHE.cgLogs.filter(x=>String(x.leader_id)===String(id)).map(x=>x.id);
+    const sIds=CACHE.sunLogs.filter(x=>String(x.leader_id)===String(id)).map(x=>x.id);
     await Promise.all([...mIds.map(i=>apiDelete(SH.MEMBERS,i)),...cIds.map(i=>apiDelete(SH.CG,i)),...sIds.map(i=>apiDelete(SH.SUN,i)),apiDelete(SH.LEADERS,id)]);
     CACHE.leaders=CACHE.leaders.filter(x=>x.id!=id);
     CACHE.members=CACHE.members.filter(x=>x.leader_id!=id);
@@ -1108,9 +1110,9 @@ async function genReports(){
 
   // ── By Leader tab
   document.getElementById('rpt-lead-body').innerHTML=CACHE.leaders.sort((a,b)=>a.name.localeCompare(b.name)).map(l=>{
-    const mc=CACHE.members.filter(x=>x.leader_id==l.id).length;
-    const lCG=cgs.filter(x=>x.leader_id==l.id);
-    const lSun=suns.filter(x=>x.leader_id==l.id);
+    const mc=CACHE.members.filter(x=>String(x.leader_id)===String(l.id)).length;
+    const lCG=cgs.filter(x=>String(x.leader_id)===String(l.id));
+    const lSun=suns.filter(x=>String(x.leader_id)===String(l.id));
     const lMonthsCG=[...new Set(lCG.map(x=>x.date.slice(0,7)))];
     const lMonthsSun=[...new Set(lSun.map(x=>x.date.slice(0,7)))];
     const totalCG=lCG.reduce((s,x)=>s+Number(x.count),0);
